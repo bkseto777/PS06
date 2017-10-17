@@ -1,6 +1,6 @@
 ---
 title: "STAT/MATH 495: Problem Set 06"
-author: "WRITE YOUR NAME HERE"
+author: "Brendan Seto"
 date: "2017-10-17"
 output:
   html_document:
@@ -10,6 +10,7 @@ output:
     collapsed: false
     smooth_scroll: false
     df_print: kable
+    code_fold: hide
 ---
 
 ```{r setup, include=FALSE}
@@ -22,16 +23,8 @@ set.seed(76)
 library(tidyverse)
 library(broom)
 library(knitr)
+library(mosaic)
 ```
-
-
-
-
-
-# Collaboration
-
-Please indicate who you collaborated with on this assignment: 
-
 
 
 
@@ -89,33 +82,44 @@ $n=100$ to keep plots uncrowded. Here we boost to $n=500$
 
 ```{r}
 n <- 500
-n_sample <- 10000
+n_sim <- 10000
 ```
 
 
 # Computation
 
 ```{r}
+# This function generates a sample and runs either a linear (df=2) or spline (df = 99) model on it
+# It then used the model to create a predicted y_hat for x0, 0.95.  
+yhat <- function(df, n){
+  sample <- generate_sample(f, n, sigma)
+  m1 <- with(sample, smooth.spline(x, y, df = df))
+  output <- predict(m1, 0.95)
+  output$y
+}
 
+
+# This function generates n_sim y_hats
+# It then calculates MSE, the var(y_hat), and the bias(y_hat)^2
+var_bias <- function(df){
+  hi <- do(n_sim)*yhat(df, n)
+  hi <- hi %>%   mutate(y_data = rnorm(n_sim, mean = f(0.95), sd = sigma), SE = (y_data-yhat)^2)
+  
+  output <- c(df, mean(hi$SE), var(hi$yhat), (mean(hi$yhat)-f(x0))^2)
+  return(output)
+}
+
+
+testing <- var_bias(2)
+
+testing <- rbind(testing, var_bias(99))
+testing <- as.data.frame(testing)
+colnames(testing) <- c("df","MSE","var","bias_squared")
+testing <- testing %>% mutate(irreducible = sigma^2, sum = var + bias_squared + irreducible)
+testing <- data.frame(Model = c("Linear", "Spline"),testing)
+
+testing %>% knitr::kable(digits = 4)
 ```
-
-
-# Tables
-
-As done in Lec 2.7, for both
-
-* An `lm` regression AKA a `smooth.splines(x, y, df=2)` model fit 
-* A `smooth.splines(x, y, df=99)` model fit 
-
-output tables comparing:
-
-|  MSE| bias_squared|   var| irreducible|   sum|
-|----:|------------:|-----:|-----------:|-----:|
-|     X|           X  |     X |      X |         X |
-
-where `sum = bias_squared + var + irreducible`. You can created cleanly formatted tables like the one above by piping a data frame into `knitr::kable(digits=4)`.
-
-
 
 
 # Analysis
@@ -123,14 +127,17 @@ where `sum = bias_squared + var + irreducible`. You can created cleanly formatte
 **Questions**:
 
 1. Based on the topics covered in Lec 2.7, name one possible "sanity check" for your results. Name another if you can.
-1. In **two** sentences or less, give a rough sketch of what the procedure would
+2. In **two** sentences or less, give a rough sketch of what the procedure would
 be to get the breakdown of $$\mbox{MSE}\left[\widehat{f}(x)\right]$$ for *all*
 $x$ in this example, and not just for $$\mbox{MSE}\left[\widehat{f}(x_0)\right]
 = \mbox{MSE}\left[\widehat{f}(0.95)\right]$$.
-1. Which of the two models would you choose for predicting the point of interest and why?
+3. Which of the two models would you choose for predicting the point of interest and why?
 
 **Answers**:
 
-1.
-1.
-1.
+1. The first sanity check is to ensure that the bias-variance tradeoff holds.  It does.  This is evident by the fact that the variance of the linear model is small and its bias is large, where as the opposite is true for the spline model.  A second check is to see if the MSE and $variance + bias^2 + \epsilon$ are similar to eachother for the same model.  This would further showcase the fact that our MSE calculations are correct.  
+
+2. The process would be very similar, except each MSE, variance and bias would be generated from many more predicted y_hats.  Instead of using 10,000 predicted values you would use 10,000 * the size of the domain X.  
+
+3. I would choose the linear model.  Underfitting the model and losing some of the signal is perferable to overfitting and losing reliability.  Even if you know the spline model is on average more accurate, it's less likely to be extremely off.  This of course depends somewhat on what the prediction is being used for and how risk averse I need to be at the time.  
+
