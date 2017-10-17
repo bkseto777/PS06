@@ -10,7 +10,7 @@ output:
     collapsed: false
     smooth_scroll: false
     df_print: kable
-    code_fold: hide
+    code_fold: show
 ---
 
 ```{r setup, include=FALSE}
